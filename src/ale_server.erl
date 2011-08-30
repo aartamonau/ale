@@ -39,6 +39,8 @@ start_link(ServerName, LoggerName, LogLevel, SyncLogLevel) ->
                           [ServerName, LoggerName, LogLevel, SyncLogLevel], []).
 
 init([ServerName, LoggerName, LogLevel, SyncLogLevel]) ->
+    process_flag(trap_exit, true),
+
     State = #state{logger_name=LoggerName,
                    server_name=ServerName,
                    loglevel=LogLevel,
