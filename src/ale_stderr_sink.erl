@@ -64,4 +64,4 @@ code_change(_OldVsn, State, _Extra) ->
 
 do_log(Formatter, Info, Format, Args) ->
     Msg = Formatter:format_msg(Info, Format, Args),
-    io:format(standard_error, Msg).
+    file:write(standard_error, Msg).
