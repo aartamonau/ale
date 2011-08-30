@@ -68,9 +68,8 @@ handle_call(get_sync_loglevel, _From,
             #state{sync_loglevel=SyncLevel} = State) ->
     {reply, SyncLevel, State};
 
-handle_call({add_sink, Name, undefined}, From,
-            #state{loglevel=LogLevel} = State) ->
-    handle_call({add_sink, Name, LogLevel}, From, State);
+handle_call({add_sink, Name, undefined}, From, State) ->
+    handle_call({add_sink, Name, debug}, From, State);
 
 handle_call({add_sink, Name, LogLevel}, _From,
             #state{sinks=Sinks} = State) ->
