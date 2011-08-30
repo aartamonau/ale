@@ -130,8 +130,15 @@ code_change(_OldVsn, State, _Extra) ->
 
 effective_loglevel(#state{loglevel=LogLevel, sinks=Sinks} = _State) ->
     Snd = fun ({_, X}) -> X end,
-    ale_utils:loglevel_min([LogLevel |
-                            lists:map(Snd, dict:to_list(Sinks))]).
+
+    case dict:size(Sinks) of
+        0 ->
+            undefined;
+        _Other ->
+            SinkLevels = lists:map(Snd, dict:to_list(Sinks)),
+            MaxSinkLevel = ale_utils:loglevel_max(SinkLevels),
+            ale_utils:loglevel_min(LogLevel, MaxSinkLevel)
+    end.
 
 needs_recompilation(#state{sync_loglevel=OldSyncLevel} = OldState,
                     #state{sync_loglevel=NewSyncLevel} = NewState) ->

@@ -33,15 +33,20 @@ integer_to_loglevel(2) -> warn;
 integer_to_loglevel(3) -> info;
 integer_to_loglevel(4) -> debug.
 
--spec loglevel_min(loglevel(), loglevel()) -> loglevel().
+-spec loglevel_min(ULogLevel, ULogLevel) -> ULogLevel
+       when ULogLevel :: undefined | loglevel().
+loglevel_min(undefined, _Y) ->
+    undefined;
+loglevel_min(_X, undefined) ->
+    undefined;
 loglevel_min(X, Y) ->
     X1 = loglevel_to_integer(X),
     Y1 = loglevel_to_integer(Y),
     integer_to_loglevel(min(X1, Y1)).
 
--spec loglevel_min([loglevel()]) -> loglevel().
-loglevel_min(LogLevels) ->
-    integer_to_loglevel(lists:min(lists:map(fun loglevel_to_integer/1,
+-spec loglevel_max([loglevel()]) -> loglevel().
+loglevel_max(LogLevels) ->
+    integer_to_loglevel(lists:max(lists:map(fun loglevel_to_integer/1,
                                             LogLevels))).
 
 -spec assemble_info(atom(), loglevel(), atom(), atom(), integer()) ->
