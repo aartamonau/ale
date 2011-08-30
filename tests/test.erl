@@ -11,7 +11,7 @@ prepare() ->
     ok = ale:start_sink(stderr, ale_stderr_sink, []),
     ok = ale:start_sink(disk, ale_disk_sink, ["/tmp/test_log"]),
 
-    ok = ale:add_sink(?REPORTS_LOGGER, disk, info),
+    ok = ale:add_sink(?ERROR_LOGGER_LOGGER, disk, info),
     ok = ale:add_sink(?ALE_LOGGER, stderr, info),
 
     ok = ale:start_logger(info),
