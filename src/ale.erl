@@ -100,9 +100,10 @@ init([MailboxLenLimit]) ->
     State = #state{mailbox_len_limit=MailboxLenLimit},
 
     {ok, State1} = do_start_logger(?ERROR_LOGGER_LOGGER,
-                                   info, ?DEFAULT_SYNC_LOGLEVEL, State),
+                                   ?DEFAULT_LOGLEVEL, ?DEFAULT_SYNC_LOGLEVEL,
+                                   State),
     {ok, State2} = do_start_logger(?ALE_LOGGER,
-                                   info, ?DEFAULT_SYNC_LOGLEVEL,
+                                   ?DEFAULT_LOGLEVEL, ?DEFAULT_SYNC_LOGLEVEL,
                                    State1),
     set_error_logger_handler(),
     rearm_timer(),
