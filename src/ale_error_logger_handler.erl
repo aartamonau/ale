@@ -41,7 +41,7 @@ handle_event({Type, _GLeader, Report},
 handle_event({Type, _GLeader, Msg},
              #state{logger=Logger} = State) when Type =:= info_msg;
                                                  Type =:= warning_msg;
-                                                 Type =:= error_msg ->
+                                                 Type =:= error ->
     log_msg(Type, Logger, Msg),
     {ok, State};
 
@@ -83,7 +83,7 @@ type_to_loglevel(warning_report) ->
     warn;
 type_to_loglevel(warning_msg) ->
     warn;
-type_to_loglevel(error_msg) ->
+type_to_loglevel(error) ->
     error;
 type_to_loglevel(error_report) ->
     error.
