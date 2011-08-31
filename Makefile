@@ -5,7 +5,7 @@ define get_version
 `([ -f VERSION ] && cat VERSION) || git describe --always`
 endef
 
-.PHONY: all clean compile dist
+.PHONY: all clean dist
 
 all: $(APP_SRC)
 	@rebar compile
