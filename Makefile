@@ -5,7 +5,7 @@ define get_version
 `([ -f VERSION ] && cat VERSION) || git describe --always`
 endef
 
-.PHONY: all clean dist
+.PHONY: all clean dist shell
 
 all: $(APP_SRC)
 	@rebar compile
@@ -26,3 +26,6 @@ dist:
 	@mkdir -p $@
 	@git archive --format=tar --prefix=ale/ HEAD | (cd $@ && tar xf -)
 	@VERSION=$(call get_version) && echo $${VERSION} > $@/ale/VERSION
+
+shell:
+	@erl -pa ebin
