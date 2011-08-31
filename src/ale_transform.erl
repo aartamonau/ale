@@ -48,14 +48,7 @@ walk_clauses(Acc, [{clause, Line, Arguments, Guards, Body}|T]) ->
 walk_body(Acc, []) ->
     lists:reverse(Acc);
 walk_body(Acc, [H|T]) ->
-    Transformed =
-        case transform(H) of
-            {splice, List} ->
-                lists:reverse(List);
-            Value ->
-                [Value]
-        end,
-    walk_body(Transformed ++ Acc, T).
+    walk_body([transform(H) | Acc], T).
 
 transform({call, Line, {remote, _Line1,
                         {atom, _Line2, ale},
@@ -77,27 +70,6 @@ transform({call, Line, {remote, Line1,
                 {atom, Line4, LoggerName} ->
                     emit_dynamic_logger_call(LoggerName, LogLevelVar, Args,
                                              Line, Line1, Line2, Line3, Line4);
-                {cons, Line4, _Head, _Tail} = Cons ->
-                    LoggerNames0 =
-                        try
-                            {ok, ast_atom_list_to_list(Cons)}
-                        catch
-                            _E:_R ->
-                                error
-                        end,
-
-                    case LoggerNames0 of
-                        {ok, LoggerNames1} ->
-                            LoggerNames2 = lists:usort(LoggerNames1),
-                            splice(
-                              [emit_dynamic_logger_call(LoggerName, LogLevelVar,
-                                                        Args,
-                                                        Line, Line1,
-                                                        Line2, Line3, Line4) ||
-                                  LoggerName <- LoggerNames2]);
-                        error ->
-                            Stmt
-                    end;
                 _Other ->
                     Stmt
             end;
@@ -115,25 +87,6 @@ transform({call, Line, {remote, Line1,
                 {atom, Line4, LoggerName} ->
                     emit_logger_call(LoggerName, LogLevel, Args,
                                      Line, Line1, Line2, Line3, Line4);
-                {cons, Line4, _Head, _Tail} = Cons ->
-                    LoggerNames0 =
-                        try
-                            {ok, ast_atom_list_to_list(Cons)}
-                        catch
-                            _E:_R ->
-                                error
-                        end,
-
-                    case LoggerNames0 of
-                        {ok, LoggerNames1} ->
-                            LoggerNames2 = lists:usort(LoggerNames1),
-                            splice([emit_logger_call(LoggerName, LogLevel, Args,
-                                                     Line, Line1,
-                                                     Line2, Line3, Line4) ||
-                                       LoggerName <- LoggerNames2]);
-                        error ->
-                            Stmt
-                    end;
                 _Other ->
                     Stmt
             end;
@@ -143,15 +96,7 @@ transform({call, Line, {remote, Line1,
 transform(Stmt) when is_tuple(Stmt) ->
     list_to_tuple(transform(tuple_to_list(Stmt)));
 transform(Stmt) when is_list(Stmt) ->
-    Transform =
-        fun (S) ->
-                Expr = transform(S),
-                case Expr of
-                    {splice, Expr1} -> Expr1;
-                    _ -> [Expr]
-                end
-        end,
-    lists:concat([Transform(S) || S <- Stmt]);
+    [transform(S) || S <- Stmt];
 transform(Stmt) ->
     Stmt.
 
@@ -209,24 +154,10 @@ list_to_ast_list(Line, []) ->
 list_to_ast_list(Line, [H | T]) ->
     {cons, Line, H, list_to_ast_list(Line, T)}.
 
-ast_list_to_list({nil, _Line}) ->
-    [];
-ast_list_to_list({cons, _Line, Head, Tail}) ->
-    [Head | ast_list_to_list(Tail)].
-
 map_ast_list(_Fn, {nil, _Line} = List) ->
     List;
 map_ast_list(Fn, {cons, Line, Head, Tail}) ->
     {cons, Line, Fn(Head), map_ast_list(Fn, Tail)}.
-
-ast_atom_to_atom({atom, _Line, Atom}) ->
-    Atom.
-
-ast_atom_list_to_list(AstList) ->
-    lists:map(fun ast_atom_to_atom/1, ast_list_to_list(AstList)).
-
-splice(Expr) ->
-    {splice, Expr}.
 
 delay(Line, Expr) ->
     SuspFn = {'fun', Line,

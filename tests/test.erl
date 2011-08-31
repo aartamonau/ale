@@ -36,9 +36,7 @@ test() ->
 
     Error = error,
     Info = info,
-    ale:log(Info, Error, "dynamic message test: ~p", [test]),
-
-    ale:error([info, test], "test message: ~p", [test]).
+    ale:log(Info, Error, "dynamic message test: ~p", [test]).
 
 test_perf_loop(0) ->
     ok;
