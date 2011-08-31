@@ -31,6 +31,9 @@ test() ->
     ale:error(info,    "test message: ~p", [RemoteSusp]),
     ale:critical(info, "test message: ~p", [test]),
 
+    ale:xcritical(info, user_data_goes_here,
+                  "test message (with user data): ~p", [test]),
+
     Error = error,
     Info = info,
     ale:log(Info, Error, "dynamic message test: ~p", [test]),

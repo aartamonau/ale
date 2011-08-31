@@ -49,9 +49,9 @@ loglevel_max(LogLevels) ->
     integer_to_loglevel(lists:max(lists:map(fun loglevel_to_integer/1,
                                             LogLevels))).
 
--spec assemble_info(atom(), loglevel(), atom(), atom(), integer()) ->
+-spec assemble_info(atom(), loglevel(), atom(), atom(), integer(), any()) ->
                            #log_info{}.
-assemble_info(Logger, LogLevel, Module, Function, Line) ->
+assemble_info(Logger, LogLevel, Module, Function, Line, UserData) ->
     Time = now(),
     Self = self(),
     Process =
@@ -69,7 +69,13 @@ assemble_info(Logger, LogLevel, Module, Function, Line) ->
               line=Line,
               time=Time,
               process=Process,
-              node=Node}.
+              node=Node,
+              user_data=UserData}.
+
+-spec assemble_info(atom(), loglevel(), atom(), atom(), integer()) ->
+                           #log_info{}.
+assemble_info(Logger, LogLevel, Module, Function, Line) ->
+    assemble_info(Logger, LogLevel, Module, Function, Line, undefined).
 
 -spec force(any()) -> any().
 force(Exprs) when is_list(Exprs) ->

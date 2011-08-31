@@ -27,11 +27,12 @@
 -type time() :: {integer(), integer(), integer()}.
 
 -record(log_info,
-        { logger   :: atom(),
-          loglevel :: loglevel(),
-          module   :: atom(),
-          function :: atom(),
-          line     :: integer(),
-          time     :: time(),
-          process  :: pid() | atom(),
-          node     :: node() }).
+        { logger    :: atom(),
+          loglevel  :: loglevel(),
+          module    :: atom(),
+          function  :: atom(),
+          line      :: integer(),
+          time      :: time(),
+          process   :: pid() | atom(),
+          node      :: node(),
+          user_data :: any() }).

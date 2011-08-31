@@ -108,7 +108,8 @@ transform({call, Line, {remote, Line1,
                         {atom, Line2, ale},
                         {atom, Line3, LogLevel}},
            [Arg | Args]} = Stmt) ->
-    case lists:member(LogLevel, ?LOGLEVELS) andalso valid_args(Args) of
+    case valid_loglevel(LogLevel) andalso
+        valid_args(extended_loglevel(LogLevel), Args) of
         true ->
             case Arg of
                 {atom, Line4, LoggerName} ->
@@ -249,6 +250,34 @@ delay_calls([Fmt, {cons, _, _, _} = Args]) ->
 delay_calls(Args) ->
     Args.
 
+extended_loglevel(LogLevel) ->
+    ExtendedLogLevels = [list_to_atom([$x | atom_to_list(LL)])
+                         || LL <- ?LOGLEVELS],
+    lists:member(LogLevel, ExtendedLogLevels).
+
+normalize_loglevel(LogLevel) ->
+    case extended_loglevel(LogLevel) of
+        false ->
+            LogLevel;
+        true ->
+            LogLevelStr = atom_to_list(LogLevel),
+            [$x | LogLevelStr1] = LogLevelStr,
+            list_to_atom(LogLevelStr1)
+    end.
+
+valid_loglevel(LogLevel) ->
+    NormLogLevel = normalize_loglevel(LogLevel),
+    lists:member(NormLogLevel, ?LOGLEVELS).
+
 valid_args(Args) ->
+    valid_args(false, Args).
+
+valid_args(ExtendedCall, Args) ->
     N = length(Args),
-    N =:= 1 orelse N =:= 2.
+
+    case ExtendedCall of
+        false ->
+            N =:= 1 orelse N =:= 2;
+        true ->
+            N =:= 2 orelse N =:= 3
+    end.
