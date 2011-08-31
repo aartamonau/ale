@@ -15,7 +15,7 @@
 
 -module(ale_codegen).
 
--export([load_logger/4, logger_impl/1, logger/4]).
+-export([load_logger/4, logger_impl/1, extended_impl/1, logger/4]).
 
 -include("ale.hrl").
 
@@ -23,6 +23,9 @@ logger_impl(Logger) when is_atom(Logger) ->
     logger_impl(atom_to_list(Logger));
 logger_impl(Logger) ->
     list_to_atom("ale_logger-" ++ Logger).
+
+extended_impl(LogLevel) ->
+    list_to_atom([$x | atom_to_list(LogLevel)]).
 
 load_logger(LoggerName, ServerName, LogLevel, SyncLevel) ->
     SourceCode = logger(LoggerName, ServerName, LogLevel, SyncLevel),

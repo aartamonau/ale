@@ -57,29 +57,26 @@ transform({call, Line, {remote, _Line1,
     delay(Line, Expr);
 transform({call, Line, {remote, Line1,
                         {atom, Line2, ale},
-                        {atom, Line3, log}},
-           [LoggerArg, LogLevelExpr | Args]} = Stmt) ->
-    case valid_args(Args) of
+                        {atom, Line3, LogFn}},
+           [LoggerExpr, LogLevelExpr | Args]} = Stmt)
+  when LogFn =:= log; LogFn =:= xlog ->
+    Extended = LogFn =:= xlog,
+
+    case valid_logger_expr(LoggerExpr) andalso
+        valid_loglevel_expr(LogLevelExpr) andalso
+        valid_args(Extended, Args) of
         true ->
-            {Valid, Line4} =
-                case LoggerArg of
-                    {var, TmpLine, _} ->
-                        {true, TmpLine};
-                    {atom, TmpLine, _} ->
-                        {true, TmpLine};
-                    {call, TmpLine, _, _} ->
-                        {true, TmpLine};
-                    _Other ->
-                        {false, undefined}
+            Line4 = get_line(LoggerExpr),
+            LogLevelExpr1 =
+                case Extended of
+                    false ->
+                        LogLevelExpr;
+                    true ->
+                        extended_loglevel_expr(LogLevelExpr)
                 end,
 
-            case Valid of
-                true ->
-                    emit_dynamic_logger_call(LoggerArg, LogLevelExpr, Args,
-                                             Line, Line1, Line2, Line3, Line4);
-                false ->
-                    Stmt
-            end;
+            emit_dynamic_logger_call(LoggerExpr, LogLevelExpr1, Args,
+                                     Line, Line1, Line2, Line3, Line4);
         false ->
             Stmt
     end;
@@ -198,6 +195,20 @@ delay_calls([UserData, Fmt, {cons, _, _, _} = Args]) ->
 delay_calls(Args) ->
     Args.
 
+extended_loglevel_expr_rt(Line, Expr) ->
+    {call, Line,
+     {remote, Line,
+      {atom, Line, ale_codegen},
+      {atom, Line, extended_impl}},
+     [Expr]}.
+
+extended_loglevel_expr({atom, Line, LogLevel}) ->
+    {atom, Line, ale_codegen:extended_impl(LogLevel)};
+extended_loglevel_expr({var, Line, _} = Expr) ->
+    extended_loglevel_expr_rt(Line, Expr);
+extended_loglevel_expr({call, Line, _, _} = Expr) ->
+    extended_loglevel_expr_rt(Line, Expr).
+
 extended_loglevel(LogLevel) ->
     ExtendedLogLevels = [list_to_atom([$x | atom_to_list(LL)])
                          || LL <- ?LOGLEVELS],
@@ -217,8 +228,30 @@ valid_loglevel(LogLevel) ->
     NormLogLevel = normalize_loglevel(LogLevel),
     lists:member(NormLogLevel, ?LOGLEVELS).
 
-valid_args(Args) ->
-    valid_args(false, Args).
+valid_loglevel_expr({atom, _Line, LogLevel}) ->
+    lists:member(LogLevel, ?LOGLEVELS);
+valid_loglevel_expr({var, _, _}) ->
+    true;
+valid_loglevel_expr({call, _, _, _}) ->
+    true;
+valid_loglevel_expr(_Other) ->
+    false.
+
+valid_logger_expr({atom, _, _}) ->
+    true;
+valid_logger_expr({var, _, _}) ->
+    true;
+valid_logger_expr({call, _, _, _}) ->
+    true;
+valid_logger_expr(_Other) ->
+    false.
+
+get_line({atom, Line, _}) ->
+    Line;
+get_line({var, Line, _}) ->
+    Line;
+get_line({call, Line, _, _}) ->
+    Line.
 
 valid_args(ExtendedCall, Args) ->
     N = length(Args),

@@ -46,7 +46,11 @@ test() ->
             "dynamic message (fn both level and logger: ~p)", [test]),
 
     ale:xinfo(info, user_data, "test message: ~p", [Fn()]),
-    ale:xerror(info, user_data, "test message: ~p", [Fn()]).
+    ale:xerror(info, user_data, "test message: ~p", [Fn()]),
+
+    ale:xlog(GetInfo(), error, user_data, "test message: ~p", [test]),
+    ale:xlog(info, GetError(), user_data, "test message: ~p", [test]),
+    ale:xlog(GetInfo(), GetError(), user_data, "test message: ~p", [test]).
 
 test_perf_loop(0) ->
     ok;
