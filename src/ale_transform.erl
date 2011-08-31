@@ -193,6 +193,8 @@ delay_call(Other) ->
 
 delay_calls([Fmt, {cons, _, _, _} = Args]) ->
     [Fmt, map_ast_list(fun delay_call/1, Args)];
+delay_calls([UserData, Fmt, {cons, _, _, _} = Args]) ->
+    [UserData, Fmt, map_ast_list(fun delay_call/1, Args)];
 delay_calls(Args) ->
     Args.
 
