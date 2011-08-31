@@ -58,19 +58,26 @@ transform({call, Line, {remote, _Line1,
 transform({call, Line, {remote, Line1,
                         {atom, Line2, ale},
                         {atom, Line3, log}},
-           [LoggerArg, {var, _Line5, LogLevelVar} | Args]} = Stmt) ->
+           [LoggerArg, LogLevelExpr | Args]} = Stmt) ->
     case valid_args(Args) of
         true ->
-            case LoggerArg of
-                {var, Line4, LoggerNameVar} ->
-                    emit_fully_dynamic_logger_call(LoggerNameVar, LogLevelVar,
-                                                   Args,
-                                                   Line, Line1,
-                                                   Line2, Line3, Line4);
-                {atom, Line4, LoggerName} ->
-                    emit_dynamic_logger_call(LoggerName, LogLevelVar, Args,
+            {Valid, Line4} =
+                case LoggerArg of
+                    {var, TmpLine, _} ->
+                        {true, TmpLine};
+                    {atom, TmpLine, _} ->
+                        {true, TmpLine};
+                    {call, TmpLine, _, _} ->
+                        {true, TmpLine};
+                    _Other ->
+                        {false, undefined}
+                end,
+
+            case Valid of
+                true ->
+                    emit_dynamic_logger_call(LoggerArg, LogLevelExpr, Args,
                                              Line, Line1, Line2, Line3, Line4);
-                _Other ->
+                false ->
                     Stmt
             end;
         false ->
@@ -118,29 +125,16 @@ emit_logger_call(LoggerName, LogLevel, Args,
     do_emit_logger_call(LoggerName, {atom, FnLine, LogLevel}, Args,
                         CallLine, RemoteLine, ModLine, ArgLine).
 
-emit_dynamic_logger_call(LoggerName, LogLevelVar, Args,
-                         CallLine, RemoteLine, ModLine, FnLine, ArgLine) ->
-    do_emit_logger_call(LoggerName, {var, FnLine, LogLevelVar}, Args,
-                        CallLine, RemoteLine, ModLine, ArgLine).
-
-emit_fully_dynamic_logger_call(LoggerNameVar, LogLevelVar, Args,
-                               CallLine, RemoteLine,
-                               ModLine, FnLine, ArgLine) ->
+do_emit_dynamic_logger_call(LoggerModule, LogLevelExpr, Args,
+                            CallLine, RemoteLine, ModLine, FnLine, ArgLine) ->
     DelayedArgs = delay_calls(Args),
-
-    CallLoggerImpl =
-        {call, ArgLine,
-         {remote, ArgLine,
-          {atom, ArgLine, ale_codegen},
-          {atom, ArgLine, logger_impl}},
-         [{var, ArgLine, LoggerNameVar}]},
 
     {call, CallLine,
      {remote, RemoteLine,
       {atom, ModLine, erlang},
       {atom, FnLine, apply}},
-     [CallLoggerImpl,
-      {var, ArgLine, LogLevelVar},
+     [LoggerModule,
+      LogLevelExpr,
       {cons, ArgLine,
        {atom, ArgLine, get(module)},
        {cons, ArgLine,
@@ -148,6 +142,27 @@ emit_fully_dynamic_logger_call(LoggerNameVar, LogLevelVar, Args,
         {cons, ArgLine,
          {integer, ArgLine, CallLine},
          list_to_ast_list(ArgLine, DelayedArgs)}}}]}.
+
+emit_dynamic_logger_call(LoggerNameExpr, LogLevelExpr, Args,
+                         CallLine, RemoteLine,
+                         ModLine, FnLine, ArgLine) ->
+    case LoggerNameExpr of
+        {atom, _, LoggerNameAtom} ->
+            ModAtom = {atom, ModLine, ale_codegen:logger_impl(LoggerNameAtom)},
+            do_emit_dynamic_logger_call(ModAtom, LogLevelExpr, Args,
+                                        CallLine, RemoteLine,
+                                        ModLine, FnLine, ArgLine);
+        _Other ->
+            CallLoggerImpl =
+                {call, ArgLine,
+                 {remote, ArgLine,
+                  {atom, ArgLine, ale_codegen},
+                  {atom, ArgLine, logger_impl}},
+                 [LoggerNameExpr]},
+            do_emit_dynamic_logger_call(CallLoggerImpl, LogLevelExpr, Args,
+                                        CallLine, RemoteLine,
+                                        ModLine, FnLine, ArgLine)
+    end.
 
 list_to_ast_list(Line, []) ->
     {nil, Line};

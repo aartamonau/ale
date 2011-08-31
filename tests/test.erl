@@ -36,7 +36,14 @@ test() ->
 
     Error = error,
     Info = info,
-    ale:log(Info, Error, "dynamic message test: ~p", [test]).
+    GetError = fun () -> error end,
+    GetInfo = fun () -> info end,
+    ale:log(Info, Error, "dynamic message test: ~p", [test]),
+    ale:log(info, Error, "dynamic but known logger: ~p", [test]),
+    ale:log(info, GetError(), "dynamic message (fn level): ~p", [test]),
+    ale:log(Info, GetError(), "dynamic message (fn level) 2: ~p", [test]),
+    ale:log(GetInfo(), GetError(),
+            "dynamic message (fn both level and logger: ~p)", [test]).
 
 test_perf_loop(0) ->
     ok;
