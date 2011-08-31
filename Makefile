@@ -5,9 +5,6 @@ define get_version
 `([ -f VERSION ] && cat VERSION) || git describe --always`
 endef
 
-vpath %.beam ebin
-vpath %.erl src
-
 .PHONY: all clean compile dist
 
 all: $(APP_SRC)
