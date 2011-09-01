@@ -50,7 +50,15 @@ test() ->
 
     ale:xlog(GetInfo(), error, user_data, "test message: ~p", [test]),
     ale:xlog(info, GetError(), user_data, "test message: ~p", [test]),
-    ale:xlog(GetInfo(), GetError(), user_data, "test message: ~p", [test]).
+    ale:xlog(GetInfo(), GetError(), user_data, "test message: ~p", [test]),
+
+    {error, {badarg, _}} = ale:start_logger(bad_logger, slkdfjlksdj),
+    {error, badarg} = ale:set_loglevel(info, lsdkjflsdkj),
+    {error, badarg} = ale:set_sync_loglevel(info, lksjdflkjs),
+    {error, badarg} = ale:set_sink_loglevel(info, disk, lsdkjflksjd),
+    {error, badarg} = ale:add_sink(?ALE_LOGGER, disk, lskdjflksdj),
+
+    ok.
 
 test_perf_loop(0) ->
     ok;

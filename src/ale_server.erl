@@ -41,28 +41,41 @@ start_link(ServerName, LoggerName, LogLevel, SyncLogLevel) ->
 init([ServerName, LoggerName, LogLevel, SyncLogLevel]) ->
     process_flag(trap_exit, true),
 
-    State = #state{logger_name=LoggerName,
-                   server_name=ServerName,
-                   loglevel=LogLevel,
-                   sync_loglevel=SyncLogLevel},
-
-    compile(State),
-
-    {ok, State}.
+    case valid_loglevel(LogLevel) andalso valid_loglevel(SyncLogLevel) of
+        true ->
+            State = #state{logger_name=LoggerName,
+                           server_name=ServerName,
+                           loglevel=LogLevel,
+                           sync_loglevel=SyncLogLevel},
+            compile(State),
+            {ok, State};
+        false ->
+            {stop, badarg}
+    end.
 
 handle_call({log, Info, Format, Args}, _From, State) ->
     {reply, do_log_sync(State, Info, Format, Args), State};
 
 handle_call({set_loglevel, Level}, _From, State) ->
-    NewState = State#state{loglevel=Level},
-    {reply, ok, maybe_recompile(State, NewState)};
+    case valid_loglevel(Level) of
+        true ->
+            NewState = State#state{loglevel=Level},
+            {reply, ok, maybe_recompile(State, NewState)};
+        false ->
+            {reply, {error, badarg}, State}
+    end;
 
 handle_call(get_loglevel, _From, #state{loglevel=Level} = State) ->
     {reply, Level, State};
 
 handle_call({set_sync_loglevel, SyncLevel}, _From, State) ->
-    NewState = State#state{sync_loglevel=SyncLevel},
-    {reply, ok, maybe_recompile(State, NewState)};
+    case valid_loglevel(SyncLevel) of
+        true ->
+            NewState = State#state{sync_loglevel=SyncLevel},
+            {reply, ok, maybe_recompile(State, NewState)};
+        false ->
+            {reply, {error, badarg}, State}
+    end;
 
 handle_call(get_sync_loglevel, _From,
             #state{sync_loglevel=SyncLevel} = State) ->
@@ -73,26 +86,36 @@ handle_call({add_sink, Name, undefined}, From, State) ->
 
 handle_call({add_sink, Name, LogLevel}, _From,
             #state{sinks=Sinks} = State) ->
-    case dict:find(Name, Sinks) of
-        {ok, _} ->
-            {reply, ok, State};
-        error ->
-            NewSinks = dict:store(Name, LogLevel, Sinks),
-            NewState = State#state{sinks=NewSinks},
-            {reply, ok, maybe_recompile(State, NewState)}
+    case valid_loglevel(LogLevel) of
+        true ->
+            case dict:find(Name, Sinks) of
+                {ok, _} ->
+                    {reply, ok, State};
+                error ->
+                    NewSinks = dict:store(Name, LogLevel, Sinks),
+                    NewState = State#state{sinks=NewSinks},
+                    {reply, ok, maybe_recompile(State, NewState)}
+            end;
+        false ->
+            {reply, {error, badarg}, State}
     end;
 
 handle_call({set_sink_loglevel, Name, NewLevel}, _From,
             #state{sinks=Sinks} = State) ->
-    case dict:find(Name, Sinks) of
-        error ->
-            {reply, not_found, State};
-        {ok, NewLevel} ->
-            {reply, ok, State};
-        {ok, _OldLevel} ->
-            NewSinks = dict:store(Name, NewLevel, Sinks),
-            NewState = State#state{sinks=NewSinks},
-            {reply, ok, maybe_recompile(State, NewState)}
+    case valid_loglevel(NewLevel) of
+        true ->
+            case dict:find(Name, Sinks) of
+                error ->
+                    {reply, not_found, State};
+                {ok, NewLevel} ->
+                    {reply, ok, State};
+                {ok, _OldLevel} ->
+                    NewSinks = dict:store(Name, NewLevel, Sinks),
+                    NewState = State#state{sinks=NewSinks},
+                    {reply, ok, maybe_recompile(State, NewState)}
+            end;
+        false ->
+            {reply, {error, badarg}, State}
     end;
 
 handle_call({get_sink_loglevel, Name}, _From,
@@ -210,3 +233,6 @@ do_log_async(#state{sinks=Sinks} = _State,
                end,
     dict:map(MaybeLog, Sinks),
     ok.
+
+valid_loglevel(LogLevel) ->
+    lists:member(LogLevel, ?LOGLEVELS).
