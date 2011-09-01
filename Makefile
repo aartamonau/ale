@@ -8,7 +8,7 @@ endef
 .PHONY: all clean dist shell
 
 all: $(APP_SRC)
-	@rebar compile
+	@./rebar compile
 
 $(APP_SRC): $(APP_SRC_IN)
 	@TMPFILE=$(APP_SRC).$$$$ && \
@@ -18,7 +18,7 @@ $(APP_SRC): $(APP_SRC_IN)
 
 clean:
 	@rm -f "$(APP_SRC)" "$(VERSION)"
-	@rebar clean
+	@./rebar clean
 	@rm -rf dist/ ebin/
 
 dist:
