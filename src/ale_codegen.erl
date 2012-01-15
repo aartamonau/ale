@@ -157,7 +157,7 @@ sync_1(LoggerName, ServerName, Sync) ->
                 io_lib:format(
                   "~p(M, F, L, Msg) -> "
                   "Info = ale_utils:assemble_info(~s, ~p, M, F, L),"
-                  "gen_server:call('~s', {log, Info, Msg, []}).~n",
+                  "gen_server:call('~s', {log, Info, Msg, []}, infinity).~n",
                   [LogLevel, LoggerName, LogLevel, ServerName])
         end,
     lists:flatten(lists:map(MkSync1, Sync)).
@@ -168,7 +168,7 @@ xsync_1(LoggerName, ServerName, Sync) ->
                 io_lib:format(
                   "x~p(M, F, L, Data, Msg) -> "
                   "Info = ale_utils:assemble_info(~s, ~p, M, F, L, Data),"
-                  "gen_server:call('~s', {log, Info, Msg, []}).~n",
+                  "gen_server:call('~s', {log, Info, Msg, []}, infinity).~n",
                   [LogLevel, LoggerName, LogLevel, ServerName])
         end,
     lists:flatten(lists:map(MkXSync1, Sync)).
@@ -180,7 +180,7 @@ sync_2(LoggerName, ServerName, Sync) ->
                   "~p(M, F, L, Fmt, Args) -> "
                   "ForcedArgs = ale_utils:force_args(Args),"
                   "Info = ale_utils:assemble_info(~s, ~p, M, F, L),"
-                  "gen_server:call('~s', {log, Info, Fmt, ForcedArgs}).~n",
+                  "gen_server:call('~s', {log, Info, Fmt, ForcedArgs}, infinity).~n",
                   [LogLevel, LoggerName, LogLevel, ServerName])
         end,
     lists:flatten(lists:map(MkSync2, Sync)).
@@ -192,7 +192,7 @@ xsync_2(LoggerName, ServerName, Sync) ->
                   "x~p(M, F, L, Data, Fmt, Args) -> "
                   "ForcedArgs = ale_utils:force_args(Args),"
                   "Info = ale_utils:assemble_info(~s, ~p, M, F, L, Data),"
-                  "gen_server:call('~s', {log, Info, Fmt, ForcedArgs}).~n",
+                  "gen_server:call('~s', {log, Info, Fmt, ForcedArgs}, infinity).~n",
                   [LogLevel, LoggerName, LogLevel, ServerName])
         end,
     lists:flatten(lists:map(MkXSync2, Sync)).
