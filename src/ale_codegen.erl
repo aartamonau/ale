@@ -29,7 +29,8 @@ extended_impl(LogLevel) ->
 
 load_logger(LoggerName, LogLevel, Formatter, Sinks) ->
     SourceCode = logger(LoggerName, LogLevel, Formatter, Sinks),
-    dynamic_compile:load_from_string(SourceCode).
+    {module, _} = dynamic_compile:load_from_string(SourceCode),
+    ok.
 
 logger(LoggerName, LogLevel, Formatter, Sinks) ->
     LoggerNameStr = atom_to_list(LoggerName),
