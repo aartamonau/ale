@@ -24,7 +24,6 @@
          add_sink/2, add_sink/3,
          set_loglevel/2, get_loglevel/1,
          set_sink_loglevel/3, get_sink_loglevel/2,
-         sync_changes/1,
          sync_sink/1]).
 
 
@@ -36,16 +35,12 @@
 
 -include("ale.hrl").
 
--record(state, {sinks             :: dict(),
-
-                loggers   :: dict(),
-                compilers :: dict(),
-                compiler_sync_waiters = []}).
+-record(state, {sinks   :: dict(),
+                loggers :: dict()}).
 
 -record(logger, {name      :: atom(),
                  loglevel  :: loglevel(),
                  sinks     :: dict(),
-                 compiler  :: undefined | pid(),
                  formatter :: module()}).
 
 -record(sink, {name     :: atom(),
@@ -96,9 +91,6 @@ set_sink_loglevel(LoggerName, SinkName, LogLevel) ->
 get_sink_loglevel(LoggerName, SinkName) ->
     gen_server:call(?MODULE, {get_sink_loglevel, LoggerName, SinkName}).
 
-sync_changes(Timeout) ->
-    gen_server:call(?MODULE, sync_compilers, Timeout).
-
 sync_sink(SinkName) ->
     try
         gen_server:call(ale_utils:sink_id(SinkName), sync, infinity)
@@ -109,11 +101,8 @@ sync_sink(SinkName) ->
 
 %% Callbacks
 init([]) ->
-    process_flag(trap_exit, true),
-
     State = #state{sinks=dict:new(),
-                   loggers=dict:new(),
-                   compilers=dict:new()},
+                   loggers=dict:new()},
 
     {ok, State1} = do_start_logger(?ERROR_LOGGER,
                                    ?DEFAULT_LOGLEVEL, ?DEFAULT_FORMATTER, State),
@@ -124,14 +113,6 @@ init([]) ->
 
     {ok, State2}.
 
-handle_call(sync_compilers, From, #state{compilers = Compilers, compiler_sync_waiters = Waiters} = State) ->
-    case dict:size(Compilers) =:= 0 of
-        true ->
-            [] = Waiters,
-            {reply, ok, State};
-        false ->
-            {noreply, State#state{compiler_sync_waiters = [From | Waiters]}}
-    end;
 handle_call({start_sink, Name, Type, Module, Args}, _From, State) ->
     RV = do_start_sink(Name, Type, Module, Args, State),
     handle_result(RV, State);
@@ -185,44 +166,6 @@ handle_info({'gen_event_EXIT', ale_error_logger_handler, Reason}, State)
 
     set_error_logger_handler(),
     {noreply, State};
-
-handle_info({'EXIT', Pid, Reason},
-            #state{compilers=Compilers, loggers=Loggers} = State) ->
-    case dict:find(Pid, Compilers) of
-        {ok, LoggerName} ->
-                case Reason of
-                    normal ->
-                        NewCompilers = dict:erase(Pid, Compilers),
-                        NewLoggers =
-                            dict:update(
-                              LoggerName,
-                              fun (#logger{compiler=Compiler} = Logger)
-                                  when Compiler =:= Pid ->
-                                      Logger#logger{compiler=undefined}
-                              end, Loggers),
-                        NewState = State#state{compilers=NewCompilers,
-                                               loggers=NewLoggers},
-                        NewState2 = case dict:size(NewCompilers) =:= 0 of
-                                        true ->
-                                            [gen_server:reply(F, ok)
-                                             || F <- NewState#state.compiler_sync_waiters],
-                                            NewState#state{compiler_sync_waiters = []};
-                                        false ->
-                                            NewState
-                                    end,
-                        {noreply, NewState2};
-                    _ ->
-                        %% should not happen
-                        ale:error(?ALE_LOGGER,
-                                  "Compiler ~p for ~p terminated "
-                                  "with non-normal reason ~p",
-                                  [Pid, LoggerName, Reason]),
-                        {stop, {compiler_died, Reason}}
-                end;
-        %% `compile' module spawn_link's processes; so we have to ignore them.
-        error ->
-            {noreply, State}
-    end;
 
 handle_info(_Info, State) ->
     {noreply, State}.
@@ -306,23 +249,18 @@ do_start_logger_tail(Name, LogLevel, Formatter,
             Logger = #logger{name=Name,
                              loglevel=LogLevel,
                              sinks=dict:new(),
-                             formatter=Formatter,
-                             compiler=undefined},
-            {State1, Logger1} = compile(State, Logger),
+                             formatter=Formatter},
 
-            State2 = store_logger(Name, Logger1, State1),
-
-            {ok, State2}
+            {ok, compile(State, Logger)}
     end.
 
 do_stop_logger(Name, #state{loggers=Loggers} = State) ->
     ensure_logger(
       Name, State,
-      fun (Logger) ->
-              {State1, _Logger1} = kill_compiler(State, Logger),
+      fun (_Logger) ->
               NewLoggers = dict:erase(Name, Loggers),
-              State2 = State1#state{loggers=NewLoggers},
-              {ok, State2}
+              State1 = State#state{loggers=NewLoggers},
+              {ok, State1}
       end).
 
 do_add_sink(LoggerName, SinkName, LogLevel, State) ->
@@ -345,7 +283,7 @@ do_add_sink_tail(LoggerName, SinkName, LogLevel, State) ->
 
                         NewSinks = dict:store(SinkName, Sink, Sinks),
                         NewLogger = Logger#logger{sinks=NewSinks},
-                        NewState = spawn_compiler_and_store(State, NewLogger),
+                        NewState = compile(State, NewLogger),
 
                         {ok, NewState}
                 end)
@@ -368,7 +306,7 @@ do_set_loglevel_tail(LoggerName, LogLevel, State) ->
                       {ok, State};
                   _ ->
                       NewLogger = Logger#logger{loglevel=LogLevel},
-                      NewState = spawn_compiler_and_store(State, NewLogger),
+                      NewState = compile(State, NewLogger),
 
                       {ok, NewState}
               end
@@ -404,7 +342,7 @@ do_set_sink_loglevel_tail(LoggerName, SinkName, LogLevel, State) ->
 
                                 NewSinks = dict:store(SinkName, NewSink, Sinks),
                                 NewLogger = Logger#logger{sinks=NewSinks},
-                                NewState = spawn_compiler_and_store(State, NewLogger),
+                                NewState = compile(State, NewLogger),
                                 {ok, NewState};
                             error ->
                                 {error, bad_sink}
@@ -432,11 +370,12 @@ set_error_logger_handler() ->
     ok = gen_event:add_sup_handler(error_logger, ale_error_logger_handler,
                                    [?ERROR_LOGGER]).
 
-do_compile(#state{sinks=SinkTypes},
-           #logger{name=LoggerName,
-                   loglevel=LogLevel,
-                   formatter=Formatter,
-                   sinks=Sinks}) ->
+compile(#state{sinks=SinkTypes,
+               loggers=Loggers} = State,
+        #logger{name=LoggerName,
+                loglevel=LogLevel,
+                formatter=Formatter,
+                sinks=Sinks} = Logger) ->
     SinksList =
         dict:fold(
           fun (SinkName,
@@ -447,50 +386,8 @@ do_compile(#state{sinks=SinkTypes},
                   [{SinkName, SinkId, SinkLogLevel, SinkType} | Acc]
           end, [], Sinks),
 
-    ale_codegen:load_logger(LoggerName, LogLevel, Formatter, SinksList).
+    ok = ale_codegen:load_logger(LoggerName, LogLevel, Formatter, SinksList),
 
-kill_compiler(#state{compilers=Compilers} = State,
-              #logger{compiler=CompilerPid} = Logger) ->
-    case CompilerPid of
-        undefined ->
-            {State, Logger};
-        _ ->
-            exit(CompilerPid, kill),
-            receive
-                {'EXIT', CompilerPid, _Reason} ->
-                    ok
-            end,
-            NewCompilers = dict:erase(CompilerPid, Compilers),
-            NewState     = State#state{compilers=NewCompilers},
-            NewLogger    = Logger#logger{compiler=undefined},
-            {NewState, NewLogger}
-    end.
-
-compile(State, Logger) ->
-    {State1, Logger1} = kill_compiler(State, Logger),
-    do_compile(State1, Logger1),
-    {State1, Logger1}.
-
-spawn_compiler(State, #logger{name=LoggerName} = Logger) ->
-    {State1, Logger1} = kill_compiler(State, Logger),
-
-    NewCompiler = proc_lib:spawn_link(
-                   fun () ->
-                           do_compile(State1, Logger1)
-                   end),
-    NewCompilers = dict:store(NewCompiler, LoggerName, State1#state.compilers),
-
-    Logger2 = Logger1#logger{compiler=NewCompiler},
-    State2  = State1#state{compilers=NewCompilers},
-
-    {State2, Logger2}.
-
-spawn_compiler_and_store(State, #logger{name=LoggerName} = Logger) ->
-    {State1, Logger1} = spawn_compiler(State, Logger),
-    store_logger(LoggerName, Logger1, State1).
-
-store_logger(LoggerName, #logger{name=LoggerName} = Logger,
-             #state{loggers=Loggers} = State) ->
     NewLoggers = dict:store(LoggerName, Logger, Loggers),
     State#state{loggers=NewLoggers}.
 
